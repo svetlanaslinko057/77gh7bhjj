@@ -1,26 +1,34 @@
 [
   {
-    "content": "Explore repo architecture & deployment requirements",
+    "content": "Study integration patterns",
     "status": "completed"
   },
   {
-    "content": "Copy repo code into /app preserving .env and .git",
+    "content": "B-layer backend: lumen_asset_intelligence.py",
     "status": "completed"
   },
   {
-    "content": "Install backend Python dependencies",
+    "content": "Admin authoring endpoints + wire router + startup",
     "status": "completed"
   },
   {
-    "content": "Install frontend dependencies (yarn) & monorepo packages",
+    "content": "Seed demo intelligence content for existing assets",
     "status": "completed"
   },
   {
-    "content": "Configure env vars (EMERGENT_LLM_KEY etc.) & restart services",
+    "content": "Frontend: shared Intelligence components + investor + public asset detail B-blocks",
     "status": "completed"
   },
   {
-    "content": "Verify backend boot + seeding + frontend renders",
+    "content": "Frontend: Conviction/Liquidity badges on opportunity cards",
     "status": "completed"
+  },
+  {
+    "content": "Frontend: admin editor for thesis/capital stack/journal/occupancy",
+    "status": "completed"
+  },
+  {
+    "content": "Test backend intelligence APIs + frontend rendering via testing agent",
+    "status": "in_progress"
   }
 ]

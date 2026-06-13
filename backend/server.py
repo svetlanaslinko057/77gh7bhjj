@@ -28578,6 +28578,14 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).error("lumen_asset_content router failed: %s", _e)
 
+# ── Lumen Asset Intelligence — Phase B Marketplace 2.0 (B1–B8) ──
+try:
+    import lumen_asset_intelligence as _lumen_intel  # noqa: E402
+    fastapi_app.include_router(_lumen_intel.router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).error("lumen_asset_intelligence router failed: %s", _e)
+
 # ── Lumen Payments & Funding + Ledger (Sprint 6) ──
 try:
     import lumen_payments as _lumen_payments  # noqa: E402
@@ -28787,6 +28795,16 @@ try:
             _lp0_log.info("[Sprint 13] Secondary demo seed: %s", _sres)
         except Exception as _ex:
             _lp0_log.exception("[Sprint 13] Secondary demo seed failed: %s", _ex)
+
+    # ── Phase B: Asset Intelligence (Marketplace 2.0) demo seed (idempotent) ──
+    @fastapi_app.on_event("startup")
+    async def _lumen_phase_b_bootstrap():
+        try:
+            from lumen_asset_intelligence import seed_intelligence_demo as _si
+            _ires = await _si()
+            _lp0_log.info("[Phase B] Asset Intelligence demo seed: %s", _ires)
+        except Exception as _ex:
+            _lp0_log.exception("[Phase B] Asset Intelligence demo seed failed: %s", _ex)
 
     # ── Admin diagnostic endpoints ───────────────────────────────────────────
     from fastapi import Depends as _p0_Depends

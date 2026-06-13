@@ -8,6 +8,10 @@ import {
   MessageCircleQuestion, Users, LogIn, Loader2, CheckCircle2, PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '@/App';
+import {
+  useAssetIntelligence, IntelligencePanel, InvestmentThesis, ScenarioEngine,
+  CapitalStack, AssetJournal, SimilarAssets, ConvictionBadge, LiquidityBadge,
+} from '@/components/lumen/AssetIntelligence';
 
 const SEVERITY_BADGE = {
   low:    { label: 'низький',  cls: 'bg-emerald-100 text-emerald-800' },
@@ -32,6 +36,7 @@ export default function InvestorAssetDetail() {
   const [error, setError] = useState(null);
   const [mainImage, setMainImage] = useState(0);
   const [payoutSummary, setPayoutSummary] = useState(null);
+  const { intel, journal, similar } = useAssetIntelligence(assetId);
 
   useEffect(() => {
     let alive = true;
@@ -96,6 +101,7 @@ export default function InvestorAssetDetail() {
 
   const TABS = [
     { key: 'overview', label: 'Огляд' },
+    { key: 'journal', label: `Шлях активу${journal?.length ? ` (${journal.length})` : ''}` },
     { key: 'updates', label: `Оновлення${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'docs', label: `Звіти й документи${(reports.length + documents.length) ? ` (${reports.length + documents.length})` : ''}` },
     { key: 'qa', label: `Питання${questions.length ? ` (${questions.length})` : ''}` },
@@ -141,6 +147,12 @@ export default function InvestorAssetDetail() {
             <span className="inline-block px-3 py-1 text-[10px] uppercase tracking-widest rounded-full bg-[#2E5D4F]/10 text-[#2E5D4F] border border-[#2E5D4F]/30">{asset.category_label || asset.category}</span>
             <h1 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">{asset.title}</h1>
             <p className="mt-2 text-muted-foreground flex items-center gap-2"><MapPin className="w-4 h-4" /> {asset.location}</p>
+            {intel && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                {intel.conviction && <ConvictionBadge score={intel.conviction.score} band={intel.conviction.band} label={intel.conviction.label} />}
+                {intel.liquidity && <LiquidityBadge score={intel.liquidity.score} band={intel.liquidity.band} label={intel.liquidity.label} />}
+              </div>
+            )}
           </div>
 
           {/* ═══ Tabs ═══ */}
@@ -158,8 +170,9 @@ export default function InvestorAssetDetail() {
           </div>
 
           {tab === 'overview' && (
-            <OverviewTab asset={asset} assetId={assetId} amount={amount} spv={spv} />
+            <OverviewTab asset={asset} assetId={assetId} amount={amount} spv={spv} intel={intel} similar={similar} />
           )}
+          {tab === 'journal' && <AssetJournal items={journal} />}
           {tab === 'updates' && <UpdatesTab updates={updates} />}
           {tab === 'docs' && <DocsTab reports={reports} documents={documents} user={user} />}
           {tab === 'qa' && (
@@ -237,19 +250,33 @@ export default function InvestorAssetDetail() {
 
 /* ────────────────────────────── Overview ────────────────────────────── */
 
-function OverviewTab({ asset, assetId, amount, spv }) {
+function OverviewTab({ asset, assetId, amount, spv, intel, similar }) {
   return (
     <div className="space-y-6" data-testid="asset-overview">
+      {/* ═══ B5+B6+B7 Intelligence panel ═══ */}
+      {intel && (
+        <IntelligencePanel metrics={intel.metrics} conviction={intel.conviction} liquidity={intel.liquidity} />
+      )}
+
       <div className="rounded-2xl border border-border bg-card p-6">
         <h2 className="font-semibold mb-2">Про об'єкт</h2>
         <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{asset.description}</p>
       </div>
+
+      {/* ═══ B1 Investment Thesis ═══ */}
+      {intel?.thesis && <InvestmentThesis thesis={intel.thesis} />}
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Pill icon={<BarChart3 className="w-4 h-4" />} label="Цільова дохідність" value={formatPercent(asset.target_yield)} />
         <Pill icon={<Calendar className="w-4 h-4" />} label="Горизонт" value={asset.horizon_label || `${asset.horizon_months || 12} міс.`} />
         <Pill icon={<ShieldCheck className="w-4 h-4" />} label="Юроболонка" value={spv?.name || asset.spv_label || 'SPV'} />
       </div>
+
+      {/* ═══ B2 Scenario Engine ═══ */}
+      {intel?.scenarios && <ScenarioEngine data={intel.scenarios} />}
+
+      {/* ═══ B3 Capital Stack ═══ */}
+      {intel?.capital_stack && <CapitalStack data={intel.capital_stack} />}
 
       {/* Videos */}
       {Array.isArray(asset.videos) && asset.videos.length > 0 && (
@@ -351,6 +378,9 @@ function OverviewTab({ asset, assetId, amount, spv }) {
           </p>
         )}
       </div>
+
+      {/* ═══ B8 Similar Assets ═══ */}
+      <SimilarAssets items={similar} basePath="/investor/assets" />
     </div>
   );
 }

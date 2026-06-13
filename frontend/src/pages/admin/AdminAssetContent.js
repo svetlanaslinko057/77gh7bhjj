@@ -4,13 +4,14 @@ import { lumen, formatDateUk, lumenError } from '@/lib/lumenApi';
 import {
   ArrowLeft, Save, Plus, Trash2, Loader2, CheckCircle2, AlertCircle,
   Image as ImageIcon, Users, AlertTriangle, Newspaper, FileText, Inbox,
-  MessageCircleQuestion, Landmark, Pin, Upload, EyeOff, Eye,
+  MessageCircleQuestion, Landmark, Pin, Upload, EyeOff, Eye, Sparkles,
 } from 'lucide-react';
 
 const TABS = [
   { key: 'media',   label: 'Медіа',          icon: ImageIcon },
   { key: 'team',    label: 'Команда',        icon: Users },
   { key: 'risks',   label: 'Ризики й вихід', icon: AlertTriangle },
+  { key: 'intel',   label: 'Marketplace 2.0', icon: Sparkles },
   { key: 'updates', label: 'Оновлення',      icon: Newspaper },
   { key: 'reports', label: 'Звіти',          icon: FileText },
   { key: 'docs',    label: 'Документи',      icon: Inbox },
@@ -73,6 +74,7 @@ export default function AdminAssetContent() {
         {tab === 'media' && <MediaTab asset={asset} setAsset={setAsset} notify={notify} fail={fail} />}
         {tab === 'team' && <TeamTab asset={asset} setAsset={setAsset} notify={notify} fail={fail} />}
         {tab === 'risks' && <RisksTab asset={asset} setAsset={setAsset} notify={notify} fail={fail} />}
+        {tab === 'intel' && <IntelTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'updates' && <UpdatesTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'reports' && <ReportsTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'docs' && <DocsTab assetId={assetId} notify={notify} fail={fail} />}
@@ -644,6 +646,202 @@ function SpvTab({ assetId, notify, fail }) {
         placeholder="Нотатки (рахунок, банк, особливості структури)…"
         className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:border-[#2E5D4F] text-sm" />
       <SaveBtn onClick={save} saving={saving} label={spv ? 'Зберегти SPV' : 'Створити SPV'} testid="spv-save" />
+    </div>
+  );
+}
+
+
+/* ──────────────────────────── Marketplace 2.0 (Phase B) ──────────────────────────── */
+
+const Area = ({ value, onChange, placeholder, rows = 3, testid }) => (
+  <textarea value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={rows} data-testid={testid}
+    className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:border-[#2E5D4F] text-sm" />
+);
+
+const NumIn = ({ value, onChange, placeholder, testid, step = '1' }) => (
+  <input type="number" step={step} value={value ?? ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testid}
+    className="h-10 px-3 rounded-xl border border-border bg-background focus:outline-none focus:border-[#2E5D4F] transition text-sm w-full" />
+);
+
+const THESIS_FIELDS = [
+  { key: 'opportunity', label: 'Можливість — чому існує ця можливість?' },
+  { key: 'market', label: 'Ринок — чому ринок це недооцінює?' },
+  { key: 'execution', label: 'Виконання — як ми це реалізуємо?' },
+  { key: 'exit', label: 'Вихід — як інвестор поверне капітал?' },
+];
+const STACK_FIELDS = [
+  { key: 'asset_value', label: 'Вартість об\u0027єкта (₴)' },
+  { key: 'debt', label: 'Банківський кредит (₴)' },
+  { key: 'platform', label: 'Кошти платформи (₴)' },
+  { key: 'investors', label: 'Кошти інвесторів (₴)' },
+  { key: 'reserve', label: 'Резервний фонд (₴)' },
+];
+const MILESTONE_KINDS = [
+  { v: 'acquisition', l: 'Придбання' }, { v: 'operations', l: 'Експлуатація' },
+  { v: 'milestone', l: 'Віха' }, { v: 'valuation', l: 'Переоцінка' },
+  { v: 'funding', l: 'Збір' }, { v: 'payout', l: 'Виплата' },
+];
+
+function IntelTab({ assetId, notify, fail }) {
+  const [thesis, setThesis] = useState({});
+  const [stack, setStack] = useState({});
+  const [occupancy, setOccupancy] = useState('');
+  const [factors, setFactors] = useState({});
+  const [defaults, setDefaults] = useState({});
+  const [milestones, setMilestones] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ date: '', title: '', body: '', kind: 'milestone' });
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(() => {
+    Promise.all([
+      lumen.get(`/admin/assets/${assetId}/intelligence`).catch(() => null),
+      lumen.get(`/admin/assets/${assetId}/journal`).catch(() => null),
+    ]).then(([i, j]) => {
+      if (i?.data) {
+        setThesis(i.data.thesis || {});
+        setStack(i.data.capital_stack || {});
+        setOccupancy(i.data.occupancy_percent ?? '');
+        setFactors(i.data.scenario_factors || {});
+        setDefaults(i.data.scenario_defaults || {});
+      }
+      setMilestones(j?.data?.items || []);
+    }).finally(() => setLoading(false));
+  }, [assetId]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await lumen.patch(`/admin/assets/${assetId}/intelligence`, {
+        thesis,
+        capital_stack: Object.fromEntries(STACK_FIELDS.map((f) => [f.key, Number(stack[f.key]) || 0])),
+        occupancy_percent: occupancy === '' ? null : Number(occupancy),
+        scenario_factors: factors,
+      });
+      notify('Marketplace 2.0 збережено');
+      reload();
+    } catch (e) { fail(e, 'Не вдалось зберегти'); }
+    finally { setSaving(false); }
+  };
+
+  const addMilestone = async () => {
+    if (!form.date || !form.title) { fail(null, 'Вкажіть дату і заголовок'); return; }
+    try {
+      await lumen.post(`/admin/assets/${assetId}/journal`, form);
+      setForm({ date: '', title: '', body: '', kind: 'milestone' });
+      notify('Віху додано');
+      reload();
+    } catch (e) { fail(e, 'Не вдалось додати віху'); }
+  };
+
+  const delMilestone = async (id) => {
+    try { await lumen.delete(`/admin/asset-journal/${id}`); notify('Віху видалено'); reload(); }
+    catch (e) { fail(e, 'Не вдалось видалити'); }
+  };
+
+  const setFactor = (key, field, val) =>
+    setFactors((p) => ({ ...p, [key]: { ...(p[key] || {}), [field]: val === '' ? undefined : Number(val) } }));
+
+  if (loading) return <div className="h-40 rounded-2xl bg-muted/40 animate-pulse" />;
+
+  return (
+    <div className="space-y-8" data-testid="intel-tab">
+      {/* B1 Thesis */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1">Investment Thesis (B1)</h3>
+        <p className="text-xs text-token-muted mb-4">Ядро карточки — навіщо інвестувати саме сюди.</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {THESIS_FIELDS.map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-xs font-medium text-token-muted">{f.label}</span>
+              <div className="mt-1"><Area value={thesis[f.key]} onChange={(v) => setThesis((p) => ({ ...p, [f.key]: v }))} rows={4} testid={`thesis-${f.key}`} /></div>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* B3 Capital Stack */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1">Capital Stack (B3)</h3>
+        <p className="text-xs text-token-muted mb-4">Структура капіталу угоди — відображається водоспадом.</p>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {STACK_FIELDS.map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-xs font-medium text-token-muted">{f.label}</span>
+              <div className="mt-1"><NumIn value={stack[f.key]} onChange={(v) => setStack((p) => ({ ...p, [f.key]: v }))} testid={`stack-${f.key}`} /></div>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {/* B6 occupancy + B2 factors */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1">Здоров'я та сценарії (B2 / B6)</h3>
+        <p className="text-xs text-token-muted mb-4">Заповнюваність живить Conviction Score. Множники — діапазон Scenario Engine (Base зазвичай 1.0).</p>
+        <label className="block max-w-xs mb-5">
+          <span className="text-xs font-medium text-token-muted">Заповнюваність, % (occupancy)</span>
+          <div className="mt-1"><NumIn value={occupancy} onChange={setOccupancy} placeholder="0–100" testid="intel-occupancy" /></div>
+        </label>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {['bear', 'base', 'bull'].map((key) => (
+            <div key={key} className="rounded-xl border border-border p-3">
+              <p className="text-sm font-medium capitalize mb-2">{key}</p>
+              <label className="block mb-2">
+                <span className="text-[11px] text-token-muted">Множник дохідності (деф. {defaults[key]?.yield_factor ?? '—'})</span>
+                <NumIn step="0.01" value={factors[key]?.yield_factor} onChange={(v) => setFactor(key, 'yield_factor', v)} testid={`factor-${key}-yield`} />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-token-muted">Множник виходу (деф. {defaults[key]?.exit_factor ?? '—'})</span>
+                <NumIn step="0.01" value={factors[key]?.exit_factor} onChange={(v) => setFactor(key, 'exit_factor', v)} testid={`factor-${key}-exit`} />
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5"><SaveBtn onClick={save} saving={saving} label="Зберегти Marketplace 2.0" testid="intel-save" /></div>
+      </section>
+
+      {/* B4 Journal milestones */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1">Asset Journal — авторські віхи (B4)</h3>
+        <p className="text-xs text-token-muted mb-4">Об'єднуються з реальними подіями системи (виплати, звіти, угоди) у живій стрічці.</p>
+        <div className="grid sm:grid-cols-[140px_1fr_160px] gap-3 mb-3">
+          <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="milestone-date"
+            className="h-10 px-3 rounded-xl border border-border bg-background text-sm" />
+          <Input value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Заголовок віхи" testid="milestone-title" />
+          <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="milestone-kind"
+            className="h-10 px-3 rounded-xl border border-border bg-background text-sm">
+            {MILESTONE_KINDS.map((k) => <option key={k.v} value={k.v}>{k.l}</option>)}
+          </select>
+        </div>
+        <Area value={form.body} onChange={(v) => setForm({ ...form, body: v })} placeholder="Опис (необов'язково)" testid="milestone-body" />
+        <button onClick={addMilestone} data-testid="milestone-add"
+          className="mt-3 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-[#2E5D4F] text-white text-sm font-medium hover:opacity-90 transition">
+          <Plus className="w-4 h-4" /> Додати віху
+        </button>
+
+        <div className="mt-5 space-y-2" data-testid="milestone-list">
+          {milestones.length === 0 ? (
+            <p className="text-sm text-token-muted">Авторських віх ще немає.</p>
+          ) : milestones.map((m) => (
+            <div key={m.id} className="flex items-start gap-3 p-3 rounded-xl border border-border bg-background/40" data-testid={`milestone-${m.id}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-token-muted">{formatDateUk(m.date)}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2E5D4F]/10 text-[#2E5D4F]">{m.kind}</span>
+                </div>
+                <p className="font-medium text-sm mt-1">{m.title}</p>
+                {m.body && <p className="text-xs text-token-muted mt-0.5">{m.body}</p>}
+              </div>
+              <button onClick={() => delMilestone(m.id)} data-testid={`milestone-del-${m.id}`}
+                className="shrink-0 p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

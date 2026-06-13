@@ -9,6 +9,10 @@ import Logo from '@/components/Logo';
 import ThemeToggle from '@/components/ThemeToggle';
 import { useAuth } from '@/App';
 import { lumen, formatUAH, formatPercent, formatDateUk } from '@/lib/lumenApi';
+import {
+  useAssetIntelligence, IntelligencePanel, InvestmentThesis, ScenarioEngine,
+  CapitalStack, AssetJournal, SimilarAssets,
+} from '@/components/lumen/AssetIntelligence';
 import './LandingPage.css';
 
 const dashFor = (user) => (user?.role === 'admin' ? '/admin/dashboard' : '/investor/dashboard');
@@ -21,6 +25,7 @@ export default function PublicAssetDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('overview');
+  const { intel, journal, similar } = useAssetIntelligence(dto?.asset_id);
 
   useEffect(() => {
     let alive = true;
@@ -61,9 +66,10 @@ export default function PublicAssetDetail() {
             <div className="min-w-0">
               <TrustBar trust={dto.trust} />
 
-              <Tabs tab={tab} setTab={setTab} dto={dto} />
+              <Tabs tab={tab} setTab={setTab} dto={dto} journalCount={journal?.length || 0} />
 
-              {tab === 'overview' && <OverviewSection dto={dto} />}
+              {tab === 'overview' && <OverviewSection dto={dto} intel={intel} similar={similar} />}
+              {tab === 'journal' && <AssetJournal items={journal} />}
               {tab === 'gallery' && <GallerySection gallery={dto.sections?.gallery} />}
               {tab === 'updates' && <UpdatesSection updates={dto.sections?.updates} reports={dto.sections?.reports} />}
               {tab === 'qa' && <QASection qa={dto.sections?.qa} />}
@@ -159,9 +165,10 @@ const TrustCell = ({ icon, label, value }) => (
   </div>
 );
 
-const Tabs = ({ tab, setTab, dto }) => {
+const Tabs = ({ tab, setTab, dto, journalCount = 0 }) => {
   const items = [
     { k: 'overview', label: 'Огляд', icon: Layers },
+    { k: 'journal', label: 'Шлях активу', icon: Calendar, count: journalCount },
     { k: 'gallery', label: 'Галерея', icon: ImageIcon, count: (dto.sections?.gallery?.photos?.length || 0) },
     { k: 'updates', label: 'Оновлення та звіти', icon: Newspaper, count: ((dto.sections?.updates?.length || 0) + (dto.sections?.reports?.length || 0)) },
     { k: 'qa', label: 'Питання', icon: HelpCircle, count: (dto.sections?.qa?.count || 0) },
@@ -183,16 +190,22 @@ const Tabs = ({ tab, setTab, dto }) => {
   );
 };
 
-const OverviewSection = ({ dto }) => {
+const OverviewSection = ({ dto, intel, similar }) => {
   const hero = dto.hero || {};
   const map = dto.sections?.map;
   return (
     <div className="space-y-8" data-testid="public-overview">
+      {intel && (
+        <IntelligencePanel metrics={intel.metrics} conviction={intel.conviction} liquidity={intel.liquidity} />
+      )}
       {hero.description && (
         <Block title="Про об'єкт">
           <p className="text-[15px] leading-relaxed text-muted-foreground whitespace-pre-line">{hero.description}</p>
         </Block>
       )}
+      {intel?.thesis && <InvestmentThesis thesis={intel.thesis} />}
+      {intel?.scenarios && <ScenarioEngine data={intel.scenarios} />}
+      {intel?.capital_stack && <CapitalStack data={intel.capital_stack} />}
       {map && (map.lat || map.region) && (
         <Block title="Розташування">
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="w-4 h-4" /> {map.address || map.region}{map.district ? `, ${map.district}` : ''}</p>
@@ -225,6 +238,7 @@ const OverviewSection = ({ dto }) => {
           </div>
         </Block>
       )}
+      <SimilarAssets items={similar} basePath="/objects" />
     </div>
   );
 };

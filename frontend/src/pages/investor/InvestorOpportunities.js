@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { lumen, formatUAH, formatPercent } from '@/lib/lumenApi';
 import { Building2 } from 'lucide-react';
+import { AssetScoreBadges } from '@/components/lumen/AssetIntelligence';
 
 const CATEGORIES = [
   { key: 'all', label: 'Усі' },
@@ -94,6 +95,7 @@ const AssetCard = ({ asset }) => (
     <div className="p-5 flex-1 flex flex-col">
       <h3 className="font-semibold text-lg leading-snug">{asset.title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{asset.location}</p>
+      <div className="mt-2"><AssetScoreBadges assetId={asset.id} /></div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Цільова дохідність</p>
