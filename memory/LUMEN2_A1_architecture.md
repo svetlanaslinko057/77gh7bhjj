@@ -7,14 +7,57 @@
 
 | Фаза | Назва | Суть | Статус |
 |------|-------|------|--------|
-| **A** | Ownership OS | Фундамент володіння: integer units, сертифікати, lifecycle | **A1 DONE** |
-| B | Asset Marketplace 2.0 | Investment Thesis, Scenario Engine, Capital Stack, Asset Journal | pending |
+| **A** | Ownership OS | Фундамент володіння: integer units, сертифікати, lifecycle | **A1/A2/A3 DONE** |
+| **B** | Asset Marketplace 2.0 | Investment Thesis, Scenario Engine, Capital Stack, Asset Journal, Live Metrics, Conviction/Liquidity Score, Similar Assets | **DONE (B1–B8)** |
 | C | Community OS | Discussion Board, Voting (голосують units), Activity Feed | pending |
 | D | Secondary Market 2.0 | Order Book (BID/ASK), Partial Fill, Market Data, Liquidity, OTC | pending |
 | E | Portfolio OS | Allocation, Health (diversification/concentration), Goals | pending |
 | F | Payment Rails 2.0 | USDT rail (тільки ввід), Auto Conversion, Multi-Currency | pending |
 | G | Issuer OS | Кабінет емітента (звіти/фото/оновлення/виплати) | pending |
 | H | Republic Layer | Категорії активів: Real Estate / Solar / Agriculture / Warehouse / Parking / Private Business | pending |
+
+---
+
+## Phase B — Asset Marketplace 2.0 (IMPLEMENTED — Asset Intelligence Layer)
+
+### Принцип
+Після A3 контур володіння закритий (купити/обліковувати/виплачувати/перепродати).
+Слабке місце — *переконати* інвестора купити саме цей об'єкт. Phase B перетворює
+статичну картку на живий організм. Усі числа деривуються з реальних колекцій —
+жодних моків. Один спроєктований шар, не B1 окремо.
+
+### Файли / колекції
+- Engine + API: `backend/lumen_asset_intelligence.py` (router prefix `/api`, wired у server.py + startup seed `seed_intelligence_demo`).
+- Авторський контент зберігається на `lumen_assets`: `thesis{opportunity,market,execution,exit}`, `capital_stack{asset_value,debt,platform,investors,reserve}`, `occupancy_percent`, `scenario_factors{bear|base|bull:{yield_factor,exit_factor}}`, `journal_milestones[]`.
+- Деривовані дані читаються з: `lumen_payout_records` (виплати), `lumen_secondary_listings/bids/trades` (ліквідність), `lumen_ownerships` (власники + avg hold), `lumen_asset_reports`/`lumen_asset_updates` (прозорість/journal).
+
+### Блоки
+- **B1 Investment Thesis** — авторські 4 поля (Opportunity/Market/Execution/Exit).
+- **B2 Scenario Engine** — Bear/Base/Bull, обчислюються з власної економіки активу (множники yield/exit; Base=1.0). Гібрид: дефолти + admin override через `scenario_factors`.
+- **B3 Capital Stack** — водоспад (debt/platform/investors/reserve) + % + investor_share. Авторський; fallback-дериватив якщо не заповнено.
+- **B4 Asset Journal** — авторські віхи MERGE з реальними подіями (публікація, закриття раунду, звіти, оновлення, виплати, угоди вторинки), сорт desc.
+- **B5 Live Metrics** — funding progress, investor_count, secondary liquidity, avg hold days, payout history, occupancy.
+- **B6 Conviction Score (0..100)** — детермінований з фактів (payout_consistency 0.30, occupancy 0.25, report_frequency 0.20, yield_history 0.15, funding 0.10). НЕ AI. band low/medium/high.
+- **B7 Liquidity Score (0..10)** — supply (listings) + demand (bids) + activity (trades 90d) + breadth (holders). band low/medium/high.
+- **B8 Similar Assets** — та сама категорія, ранжування за близькістю дохідності.
+
+### API
+- Public/investor: `GET /api/assets/{id}/intelligence|scenarios|capital-stack|journal|metrics|conviction|liquidity|similar`
+- Admin: `GET /api/admin/assets/{id}/intelligence`, `PATCH /api/admin/assets/{id}/intelligence` (thesis/capital_stack/occupancy/scenario_factors), `GET/POST /api/admin/assets/{id}/journal`, `DELETE /api/admin/asset-journal/{milestone_id}`
+
+### Frontend
+- Спільні компоненти: `src/components/lumen/AssetIntelligence.js` (IntelligencePanel, InvestmentThesis, ScenarioEngine, CapitalStack, AssetJournal, SimilarAssets, ConvictionBadge/LiquidityBadge/AssetScoreBadges, useAssetIntelligence).
+- Investor `pages/investor/InvestorAssetDetail.js` — блоки B1/B2/B3/B5/B6/B7 у вкладці «Огляд», нова вкладка «Шлях активу» (B4), «Схожі об'єкти» (B8), бейджі у заголовку.
+- Public `pages/PublicAssetDetail.js` — той самий досвід без auth (basePath `/objects`).
+- Cards: `pages/investor/InvestorOpportunities.js` — `AssetScoreBadges` (conviction+liquidity) на картках.
+- Admin authoring: `pages/admin/AdminAssetContent.js` — вкладка «Marketplace 2.0» (thesis/capital stack/occupancy/scenario factors/journal milestones).
+
+### Тести (iteration_4.json)
+- Backend 32/33 ✅ (1 transient 502, не баг). Frontend 100% ✅. 0 critical/UI/integration issues.
+- Демо-сід: 5 активів збагачено thesis+capital_stack+occupancy+milestones на старті (ідемпотентно).
+
+---
+
 
 ## Phase A — Ownership OS
 
