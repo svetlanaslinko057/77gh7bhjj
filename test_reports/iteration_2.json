@@ -1,0 +1,50 @@
+{
+  "summary": "LUMEN 2.0 Phase A2 — Certificate Engine testing completed. All backend APIs working, A2 invariants green, public verify privacy-safe, burn & re-issue flow verified with A1 safety, all frontend pages functional.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "Backend: GET /api/admin/certificates returns 5 active certs + counts (active/voided/replaced/expired/draft)",
+    "Backend: GET /api/admin/certificates/invariants/check returns all_ok=true with 4 checks (active_units_match_registry, single_active_per_owner, every_active_ownership_has_cert, verify_codes_unique)",
+    "Backend: GET /api/investor/certificates returns 3 active certs for client@atlas.dev",
+    "Backend: GET /api/public/certificates/verify/DAE7-E6EF-7196 returns sanitized view WITHOUT investor_id or investor_name (PRIVACY-CRITICAL CHECK PASSED)",
+    "Backend: GET /api/public/certificates/verify/INVALID-CODE returns 404",
+    "Backend: GET /api/investor/certificates/{id}/pdf returns valid PDF with %PDF header (15.5KB)",
+    "Backend: POST /api/admin/certificates/{id}/void successfully voids certificate",
+    "Backend: POST /api/admin/certificates/{id}/reissue successfully re-issues certificate",
+    "Backend: POST /api/admin/certificates/reconcile completes reconciliation",
+    "Backend: GET /api/admin/registry/invariants returns all_ok=true (A1 registry invariants)",
+    "Backend: BURN & RE-ISSUE flow verified - executed secondary buy-now trade (10000 UAH), buyer received new active certificate (LMN-2026-000010) with updated units (2500), old certificate moved to history, A2 invariants stayed all_ok=true, A1 registry invariants stayed all_ok=true",
+    "Frontend: Public /certificates/verify/DAE7-E6EF-7196 renders valid certificate card with asset/SPV/units/%/date/code, shows 'Сертифікат дійсний', includes 'private data not disclosed' note",
+    "Frontend: Public /certificates/verify/INVALID-CODE shows 'Сертифікат не знайдено' message",
+    "Frontend: Investor /investor/certificates page loads with nav 'Сертифікати', displays 3+ active certificate cards with units/%/value, PDF button opens PDF, Перевірити link opens public verify, Історія button opens event drawer",
+    "Frontend: Admin /admin/certificates page loads with nav 'Сертифікати', displays status counts (5 active, 4 replaced, 2 voided), invariants pill shows 'Інваріанти OK', Звірити (reconcile) button present, filter tabs (Усі/Активні/Замінені/Анульовані) working, search input present, table shows 11 certificate rows, clicking row opens detail drawer with Перевипустити/Анулювати/PDF actions"
+  ],
+  
+  "test_report_links": [
+    "/app/backend_test.py",
+    "/root/.emergent/automation_output/20260613_192029/console_20260613_192029.log"
+  ],
+  
+  "success_percentage": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (3/3 pages tested, all functional)",
+    "overall": "100%"
+  },
+  
+  "updated_files": [],
+  
+  "action_item_for_main_agent": "",
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

@@ -1,0 +1,29 @@
+{
+  "id": "backup-20260612-131223-sprint10-smoke",
+  "created_at": "2026-06-12T13:12:23.673402+00:00",
+  "label": "sprint10-smoke",
+  "collections": {
+    "users": 12,
+    "user_sessions": 2,
+    "lumen_investor_profiles": 1,
+    "lumen_kyc_documents": 0,
+    "lumen_assets": 6,
+    "lumen_investment_rounds": 6,
+    "lumen_investments": 3,
+    "lumen_ownerships": 3,
+    "lumen_contracts": 3,
+    "lumen_contract_templates": 3,
+    "lumen_payment_requests": 3,
+    "lumen_payment_proofs": 0,
+    "lumen_funding_accounts": 3,
+    "lumen_ledger_entries": 6,
+    "lumen_wallets": 1,
+    "lumen_withdrawal_requests": 0,
+    "lumen_payout_plans": 1,
+    "lumen_payout_batches": 4,
+    "lumen_payout_records": 4,
+    "lumen_audit_log": 0
+  },
+  "files_archive": "uploads.tar.gz",
+  "total_size_bytes": 210030
+}

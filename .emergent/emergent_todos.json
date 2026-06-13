@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Explore repo architecture & deployment requirements",
+    "status": "completed"
+  },
+  {
+    "content": "Copy repo code into /app preserving .env and .git",
+    "status": "completed"
+  },
+  {
+    "content": "Install backend Python dependencies",
+    "status": "completed"
+  },
+  {
+    "content": "Install frontend dependencies (yarn) & monorepo packages",
+    "status": "completed"
+  },
+  {
+    "content": "Configure env vars (EMERGENT_LLM_KEY etc.) & restart services",
+    "status": "completed"
+  },
+  {
+    "content": "Verify backend boot + seeding + frontend renders",
+    "status": "completed"
+  }
+]

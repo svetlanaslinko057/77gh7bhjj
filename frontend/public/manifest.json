@@ -1,0 +1,17 @@
+{
+  "name": "Lumen — Колективні інвестиції в реальні активи",
+  "short_name": "Lumen",
+  "description": "Українська платформа колективного вкладення в нерухомість, землю, будівництво та комерційні об'єкти. SPV-структура, юридичні договори, регулярні виплати.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F0F11",
+  "theme_color": "#0F0F11",
+  "lang": "uk",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    { "src": "/lumen-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/lumen-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

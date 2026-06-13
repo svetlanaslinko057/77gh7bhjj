@@ -1,0 +1,48 @@
+{
+  "summary": "LUMEN 2.0 Phase A3 — Ownership Lifecycle testing completed. Backend APIs fully functional (28/28 tests passed). Frontend UI verified with screenshots showing investor journey with 8-step timeline and admin registry with ownership explorer.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "✅ Backend: Admin and investor authentication working",
+    "✅ Backend: GET /api/investor/lifecycle returns 3 investments with canonical_state='active', certificate_number, units, 8-step array",
+    "✅ Backend: GET /api/investor/lifecycle/{investment_id} returns detailed lifecycle",
+    "✅ Backend: GET /api/admin/lifecycle/states returns state counts (active=3)",
+    "✅ Backend: GET /api/admin/ownership/trace returns full trace with ownership (certificate_number=LMN-2026-000003), lifecycle, investments, payments, ledger, certificates, payouts, secondary_trades, ownership_events",
+    "✅ Backend: GET /api/admin/ownership/{ownership_id}/trace works",
+    "✅ Backend: Block1 Certificate Binding - ownership has certificate_id and certificate_number bound",
+    "✅ Backend: A1 Unit Registry invariants all_ok=true (conservation, issued_matches_holders, issued_within_total, no_negative_units)",
+    "✅ Backend: A2 Certificate Engine invariants all_ok=true (active_units_match_registry, single_active_per_owner, every_active_ownership_has_cert, verify_codes_unique)",
+    "✅ Frontend: /investor/journey page loads and displays investment cards",
+    "✅ Frontend: Investment cards are expandable showing 8-step vertical timeline (Заявка, KYC, Договір, Оплата, Сертифікат, Активна інвестиція, Перша виплата, Виведення доходу)",
+    "✅ Frontend: Timeline shows done steps (green checkmarks), current step highlighted, pending steps dimmed",
+    "✅ Frontend: Canonical state badge visible ('Активна інвестиція')",
+    "✅ Frontend: Progress indicator shows 7/8 steps completed",
+    "✅ Frontend: /admin/registry page loads with dashboard showing totals (600,000 total units, 17,612 issued, 3,304 on secondary market, 582,388 available)",
+    "✅ Frontend: Asset cards display with subscription percentages and unit counts",
+    "✅ Frontend: Navigation 'Шлях інвестицій' (Investor Journey) and 'Реєстр одиниць' (Unit Registry) working"
+  ],
+  "test_report_links": [
+    "/app/test_a3_backend.sh",
+    "/app/.screenshots/investor_journey.png",
+    "/app/.screenshots/investor_journey_expanded.png",
+    "/app/.screenshots/admin_registry.png"
+  ],
+  "action_item_for_main_agent": "CRITICAL TEST NEEDED: Perform a secondary trade (buy-now) as investor client@atlas.dev and verify: (a) A1 registry invariants stay all_ok=true, (b) A2 certificate invariants stay all_ok=true, (c) ownership rows remain bound to active certificates, (d) certificate events include ownership_split/ownership_merge/transferred. This is the most critical test for A3 as it validates that A1+A2 invariants remain green after A3 operations. Also, the admin ownership explorer 'Trace' button functionality needs UI testing - clicking on an asset card in /admin/registry should open asset details, then clicking 'Trace' button on a holder row should open the ownership explorer drawer with all trace sections visible.",
+  "updated_files": [
+    "/app/test_a3_backend.sh",
+    "/app/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (28/28 tests passed)",
+    "frontend": "90% (UI loads correctly, expandable timeline works, but Trace button interaction not fully tested)"
+  },
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": true
+}

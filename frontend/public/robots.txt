@@ -1,0 +1,28 @@
+# https://www.robotstxt.org/robotstxt.html
+# Lumen public surfaces
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /investor/
+Disallow: /two-factor-challenge
+Disallow: /two-factor-setup
+Disallow: /two-factor-recovery
+Disallow: /auth
+Disallow: /login
+
+# Block AI scrapers we don't want training on our content
+User-agent: GPTBot
+Disallow: /
+User-agent: ChatGPT-User
+Disallow: /
+User-agent: anthropic-ai
+Disallow: /
+User-agent: ClaudeBot
+Disallow: /
+User-agent: CCBot
+Disallow: /
+User-agent: Google-Extended
+Disallow: /
+
+Sitemap: https://lumen.com.ua/sitemap.xml

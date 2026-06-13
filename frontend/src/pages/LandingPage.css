@@ -1,0 +1,224 @@
+/* Lumen rich landing styles — visual richness layer.
+ * Keeps the same icon-stroke style, same Tailwind utility-first approach;
+ * only adds gradient warmth, motion, depth shadows. Auto theme-aware
+ * via CSS vars defined in index.css. */
+
+.lumen-landing {
+  --lumen-flame-1: #E5C98A;
+  --lumen-flame-2: #C9A961;
+  --lumen-flame-3: #A98A45;
+  --lumen-flame-4: #3F6B5B;
+  --lumen-glow: rgba(201, 169, 97, 0.32);
+  --lumen-card-shadow: 0 14px 40px -20px rgba(46, 93, 79, 0.25);
+  --lumen-card-shadow-hover: 0 24px 64px -24px rgba(46, 93, 79, 0.45);
+}
+
+/* ─────────── BACKGROUNDS ─────────── */
+
+.lumen-hero-bg {
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 18% 0%, rgba(201,169,97,0.18), transparent 60%),
+    radial-gradient(800px 600px at 95% 6%, rgba(46,93,79,0.14), transparent 65%),
+    radial-gradient(640px 480px at 50% 100%, rgba(229,201,138,0.1), transparent 70%);
+}
+
+.lumen-cta-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(700px 500px at 10% 50%, rgba(229,201,138,0.18), transparent 60%),
+    radial-gradient(700px 500px at 90% 50%, rgba(46,93,79,0.18), transparent 60%);
+}
+
+/* ─────────── TYPOGRAPHY ─────────── */
+
+.lumen-gradient-text {
+  background: linear-gradient(120deg, #E5C98A 0%, #C9A961 40%, #A98A45 80%, #8D7430 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.lumen-h2 {
+  margin-top: 0.75rem;
+  font-size: clamp(1.875rem, 2.5vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.lumen-section-sub {
+  margin-top: 0.875rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--muted-foreground, hsl(215, 16%, 45%));
+  max-width: 42rem;
+}
+
+/* ─────────── BUTTONS ─────────── */
+
+.lumen-btn-primary,
+.lumen-btn-primary-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--foreground, #0F0F11);
+  color: var(--background, #FFF);
+  font-weight: 600;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, opacity 0.15s ease;
+  box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.4);
+}
+.lumen-btn-primary { padding: 0 1.25rem; height: 2.5rem; font-size: 0.875rem; }
+.lumen-btn-primary-lg { padding: 0 1.75rem; height: 3rem; font-size: 0.9375rem; }
+.lumen-btn-primary:hover,
+.lumen-btn-primary-lg:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.5);
+}
+
+.lumen-btn-ghost-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.75rem;
+  height: 3rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.18s ease;
+}
+.lumen-btn-ghost-lg:hover {
+  border-color: var(--lumen-flame-2);
+  background: rgba(201, 169, 97, 0.06);
+  transform: translateY(-1px);
+}
+
+/* ─────────── CARDS ─────────── */
+
+.lumen-card {
+  position: relative;
+  border-radius: 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 1.5rem;
+  transition: border-color 0.25s ease, transform 0.22s ease, box-shadow 0.25s ease;
+}
+.lumen-card:hover {
+  border-color: rgba(201, 169, 97, 0.4);
+  transform: translateY(-2px);
+  box-shadow: var(--lumen-card-shadow-hover);
+}
+
+.lumen-card-elevated {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card) 0%, var(--card) 60%, rgba(201,169,97,0.05) 100%);
+  padding: 2rem;
+  box-shadow: var(--lumen-card-shadow);
+}
+
+.lumen-hero-card {
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  overflow: hidden;
+  box-shadow:
+    0 32px 80px -32px rgba(46, 93, 79, 0.5),
+    0 8px 24px -8px rgba(0, 0, 0, 0.18);
+}
+
+.lumen-asset-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+}
+.lumen-asset-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--lumen-card-shadow-hover);
+  border-color: rgba(201, 169, 97, 0.4);
+}
+
+/* ─────────── TICKER ─────────── */
+
+@keyframes lumen-ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-33.333%); }
+}
+.lumen-ticker {
+  width: max-content;
+  animation: lumen-ticker-scroll 60s linear infinite;
+}
+
+/* ─────────── SLIDER ─────────── */
+
+.lumen-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: linear-gradient(90deg, #C9A961 0%, #A98A45 100%);
+  border-radius: 999px;
+  outline: none;
+  opacity: 0.95;
+  transition: opacity 0.15s ease;
+}
+.lumen-slider:hover { opacity: 1; }
+.lumen-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #2E5D4F;
+  cursor: pointer;
+  box-shadow: 0 4px 12px -2px rgba(46, 93, 79, 0.45);
+}
+.lumen-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #2E5D4F;
+  cursor: pointer;
+  box-shadow: 0 4px 12px -2px rgba(46, 93, 79, 0.45);
+}
+
+/* ─────────── IMPACT / UA LAYER ─────────── */
+
+.lumen-impact-bg {
+  position: relative;
+  background:
+    radial-gradient(800px 600px at 12% 0%, rgba(255,213,79,0.06), transparent 60%),
+    radial-gradient(800px 600px at 88% 100%, rgba(0,87,184,0.05), transparent 60%);
+}
+
+.lumen-card-accent {
+  border-color: rgba(201, 169, 97, 0.35);
+  background: linear-gradient(160deg, var(--card) 0%, var(--card) 65%, rgba(201, 169, 97, 0.08) 100%);
+  box-shadow: 0 12px 32px -16px rgba(46, 93, 79, 0.25);
+}
+.lumen-card-accent:hover {
+  border-color: rgba(201, 169, 97, 0.6);
+  box-shadow: 0 20px 48px -20px rgba(46, 93, 79, 0.45);
+}
+
+/* ─────────── REDUCED MOTION ─────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .lumen-ticker { animation: none; }
+  .lumen-btn-primary, .lumen-btn-primary-lg, .lumen-btn-ghost-lg,
+  .lumen-card, .lumen-asset-card { transition: none; }
+}
