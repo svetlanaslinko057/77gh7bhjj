@@ -12,6 +12,7 @@ import {
   useAssetIntelligence, IntelligencePanel, InvestmentThesis, ScenarioEngine,
   CapitalStack, AssetJournal, SimilarAssets, ConvictionBadge, LiquidityBadge,
 } from '@/components/lumen/AssetIntelligence';
+import AssetCommunity from '@/components/lumen/AssetCommunity';
 
 const SEVERITY_BADGE = {
   low:    { label: 'низький',  cls: 'bg-emerald-100 text-emerald-800' },
@@ -101,6 +102,7 @@ export default function InvestorAssetDetail() {
 
   const TABS = [
     { key: 'overview', label: 'Огляд' },
+    { key: 'community', label: 'Спільнота' },
     { key: 'journal', label: `Шлях активу${journal?.length ? ` (${journal.length})` : ''}` },
     { key: 'updates', label: `Оновлення${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'docs', label: `Звіти й документи${(reports.length + documents.length) ? ` (${reports.length + documents.length})` : ''}` },
@@ -172,6 +174,7 @@ export default function InvestorAssetDetail() {
           {tab === 'overview' && (
             <OverviewTab asset={asset} assetId={assetId} amount={amount} spv={spv} intel={intel} similar={similar} />
           )}
+          {tab === 'community' && <AssetCommunity assetId={assetId} user={user} basePath="investor" />}
           {tab === 'journal' && <AssetJournal items={journal} />}
           {tab === 'updates' && <UpdatesTab updates={updates} />}
           {tab === 'docs' && <DocsTab reports={reports} documents={documents} user={user} />}

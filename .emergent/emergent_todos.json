@@ -1,34 +1,26 @@
 [
   {
-    "content": "Study integration patterns",
+    "content": "Study patterns",
     "status": "completed"
   },
   {
-    "content": "B-layer backend: lumen_asset_intelligence.py",
+    "content": "Backend lumen_community.py (C1-C7)",
     "status": "completed"
   },
   {
-    "content": "Admin authoring endpoints + wire router + startup",
+    "content": "Wire router + indexes + demo seed",
     "status": "completed"
   },
   {
-    "content": "Seed demo intelligence content for existing assets",
+    "content": "Frontend: community components + integrate into asset detail (investor + public)",
     "status": "completed"
   },
   {
-    "content": "Frontend: shared Intelligence components + investor + public asset detail B-blocks",
+    "content": "Frontend: admin announcements + poll creation/moderation in AdminAssetContent",
     "status": "completed"
   },
   {
-    "content": "Frontend: Conviction/Liquidity badges on opportunity cards",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: admin editor for thesis/capital stack/journal/occupancy",
-    "status": "completed"
-  },
-  {
-    "content": "Test backend intelligence APIs + frontend rendering via testing agent",
-    "status": "completed"
+    "content": "Test Phase C end-to-end via testing agent",
+    "status": "in_progress"
   }
 ]

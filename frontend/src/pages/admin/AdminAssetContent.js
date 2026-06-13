@@ -5,6 +5,7 @@ import {
   ArrowLeft, Save, Plus, Trash2, Loader2, CheckCircle2, AlertCircle,
   Image as ImageIcon, Users, AlertTriangle, Newspaper, FileText, Inbox,
   MessageCircleQuestion, Landmark, Pin, Upload, EyeOff, Eye, Sparkles,
+  Megaphone, Vote,
 } from 'lucide-react';
 
 const TABS = [
@@ -12,6 +13,7 @@ const TABS = [
   { key: 'team',    label: 'Команда',        icon: Users },
   { key: 'risks',   label: 'Ризики й вихід', icon: AlertTriangle },
   { key: 'intel',   label: 'Marketplace 2.0', icon: Sparkles },
+  { key: 'community', label: 'Спільнота',    icon: Megaphone },
   { key: 'updates', label: 'Оновлення',      icon: Newspaper },
   { key: 'reports', label: 'Звіти',          icon: FileText },
   { key: 'docs',    label: 'Документи',      icon: Inbox },
@@ -75,6 +77,7 @@ export default function AdminAssetContent() {
         {tab === 'team' && <TeamTab asset={asset} setAsset={setAsset} notify={notify} fail={fail} />}
         {tab === 'risks' && <RisksTab asset={asset} setAsset={setAsset} notify={notify} fail={fail} />}
         {tab === 'intel' && <IntelTab assetId={assetId} notify={notify} fail={fail} />}
+        {tab === 'community' && <CommunityTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'updates' && <UpdatesTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'reports' && <ReportsTab assetId={assetId} notify={notify} fail={fail} />}
         {tab === 'docs' && <DocsTab assetId={assetId} notify={notify} fail={fail} />}
@@ -845,3 +848,158 @@ function IntelTab({ assetId, notify, fail }) {
     </div>
   );
 }
+
+/* ──────────────────────────── Community OS (Phase C) ──────────────────────────── */
+
+function CommunityTab({ assetId, notify, fail }) {
+  const [ann, setAnn] = useState({ title: '', body: '' });
+  const [poll, setPoll] = useState({ question: '', options: ['', ''], closes_in_days: 14 });
+  const [feed, setFeed] = useState([]);
+  const [polls, setPolls] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(() => {
+    Promise.all([
+      lumen.get(`/assets/${assetId}/community/feed`).catch(() => null),
+      lumen.get(`/assets/${assetId}/community/polls`).catch(() => null),
+    ]).then(([f, p]) => {
+      setFeed(f?.data?.items || []);
+      setPolls(p?.data?.items || []);
+    }).finally(() => setLoading(false));
+  }, [assetId]);
+  useEffect(() => { reload(); }, [reload]);
+
+  const publishAnn = async () => {
+    if (!ann.title.trim()) { fail(null, 'Вкажіть заголовок'); return; }
+    setBusy(true);
+    try {
+      const r = await lumen.post(`/admin/assets/${assetId}/community/announcements`, ann);
+      notify(`Оголошення опубліковано · сповіщено ${r.data.notified} власників`);
+      setAnn({ title: '', body: '' }); reload();
+    } catch (e) { fail(e, 'Не вдалось опублікувати'); } finally { setBusy(false); }
+  };
+
+  const createPoll = async () => {
+    const opts = poll.options.map((o) => o.trim()).filter(Boolean);
+    if (!poll.question.trim() || opts.length < 2) { fail(null, 'Питання і ≥2 варіанти'); return; }
+    setBusy(true);
+    try {
+      await lumen.post(`/admin/assets/${assetId}/community/polls`, { question: poll.question, options: opts, closes_in_days: Number(poll.closes_in_days) || null });
+      notify('Голосування створено');
+      setPoll({ question: '', options: ['', ''], closes_in_days: 14 }); reload();
+    } catch (e) { fail(e, 'Не вдалось створити'); } finally { setBusy(false); }
+  };
+
+  const answerPost = async (id) => {
+    const answer = window.prompt('Відповідь оператора:');
+    if (!answer) return;
+    try { await lumen.post(`/admin/community/posts/${id}/answer`, { answer }); notify('Відповідь опубліковано'); reload(); }
+    catch (e) { fail(e, 'Помилка'); }
+  };
+  const hidePost = async (id) => {
+    if (!window.confirm('Приховати цей запис?')) return;
+    try { await lumen.delete(`/admin/community/posts/${id}`); notify('Запис приховано'); reload(); }
+    catch (e) { fail(e, 'Помилка'); }
+  };
+  const pinPost = async (id) => {
+    try { await lumen.post(`/admin/community/posts/${id}/pin`); reload(); } catch (e) { fail(e, 'Помилка'); }
+  };
+  const closePoll = async (id) => {
+    try { await lumen.post(`/admin/community/polls/${id}/close`); notify('Голосування закрито'); reload(); }
+    catch (e) { fail(e, 'Помилка'); }
+  };
+
+  if (loading) return <div className="h-40 rounded-2xl bg-muted/40 animate-pulse" />;
+
+  return (
+    <div className="space-y-8" data-testid="community-admin-tab">
+      {/* C7 Announcement */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1 flex items-center gap-2"><Megaphone className="w-4 h-4 text-[#2E5D4F]" />Оголошення (C7)</h3>
+        <p className="text-xs text-token-muted mb-4">Публікація сповіщає всіх власників часток об'єкта.</p>
+        <Input value={ann.title} onChange={(v) => setAnn({ ...ann, title: v })} placeholder="Заголовок (напр. «Новий орендар підписаний»)" testid="ann-title" />
+        <div className="mt-2"><Area value={ann.body} onChange={(v) => setAnn({ ...ann, body: v })} placeholder="Деталі оголошення" rows={3} testid="ann-body" /></div>
+        <button onClick={publishAnn} disabled={busy} data-testid="ann-publish"
+          className="mt-3 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-[#2E5D4F] text-white text-sm font-medium hover:opacity-90 disabled:opacity-60">
+          <Megaphone className="w-4 h-4" /> Опублікувати та сповістити
+        </button>
+      </section>
+
+      {/* C4 Poll */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-1 flex items-center gap-2"><Vote className="w-4 h-4 text-[#2E5D4F]" />Голосування (C4)</h3>
+        <p className="text-xs text-token-muted mb-4">Вага голосу = units власника. Рекомендаційне.</p>
+        <Input value={poll.question} onChange={(v) => setPoll({ ...poll, question: v })} placeholder="Питання голосування" testid="poll-question" />
+        <div className="mt-3 space-y-2">
+          {poll.options.map((o, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input value={o} onChange={(v) => { const opts = [...poll.options]; opts[i] = v; setPoll({ ...poll, options: opts }); }} placeholder={`Варіант ${i + 1}`} testid={`poll-opt-${i}`} />
+              {poll.options.length > 2 && (
+                <button onClick={() => setPoll({ ...poll, options: poll.options.filter((_, j) => j !== i) })} className="p-2 rounded-lg border border-red-200 text-red-600"><Trash2 className="w-4 h-4" /></button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 mt-3">
+          {poll.options.length < 6 && (
+            <button onClick={() => setPoll({ ...poll, options: [...poll.options, ''] })} data-testid="poll-add-opt"
+              className="inline-flex items-center gap-1 text-sm text-[#2E5D4F]"><Plus className="w-4 h-4" />Варіант</button>
+          )}
+          <label className="text-xs text-token-muted ml-auto">Закрити через
+            <input type="number" value={poll.closes_in_days} onChange={(e) => setPoll({ ...poll, closes_in_days: e.target.value })}
+              className="w-16 mx-2 h-8 px-2 rounded-lg border border-border bg-background text-sm" /> днів</label>
+        </div>
+        <button onClick={createPoll} disabled={busy} data-testid="poll-create"
+          className="mt-3 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-[#2E5D4F] text-white text-sm font-medium hover:opacity-90 disabled:opacity-60">
+          <Plus className="w-4 h-4" /> Створити голосування
+        </button>
+
+        {polls.length > 0 && (
+          <div className="mt-5 space-y-2">
+            {polls.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl border border-border" data-testid={`admin-poll-${p.id}`}>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{p.question}</p>
+                  <p className="text-xs text-token-muted">{p.total_voters} голосів · {Number(p.total_units).toLocaleString('uk-UA')} units · {p.status === 'open' ? 'відкрите' : 'закрите'}</p>
+                </div>
+                {p.status === 'open' && <button onClick={() => closePoll(p.id)} className="text-xs px-3 h-8 rounded-full border border-border">Закрити</button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Moderation */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="font-semibold mb-3">Модерація стрічки</h3>
+        {feed.length === 0 ? <p className="text-sm text-token-muted">Записів ще немає.</p> : (
+          <div className="space-y-2">
+            {feed.map((p) => (
+              <div key={p.id} className="flex items-start gap-3 p-3 rounded-xl border border-border" data-testid={`admin-post-${p.id}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted">{p.kind}</span>
+                    {p.visibility === 'holders' && <span className="text-[10px] text-token-muted">lounge</span>}
+                    {p.pinned && <Pin className="w-3 h-3 text-[#C99B3D]" />}
+                    <span className="text-xs text-token-muted">{p.author_name}</span>
+                  </div>
+                  <p className="font-medium text-sm mt-1">{p.title || p.body?.slice(0, 60)}</p>
+                  {p.answer && <p className="text-xs text-[#2E5D4F] mt-1">✓ відповідь надано</p>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {p.kind === 'question' && !p.answer && (
+                    <button onClick={() => answerPost(p.id)} data-testid={`answer-${p.id}`} className="text-xs px-3 h-8 rounded-full bg-[#2E5D4F] text-white">Відповісти</button>
+                  )}
+                  <button onClick={() => pinPost(p.id)} className="p-2 rounded-lg border border-border" title="Закріпити"><Pin className="w-4 h-4" /></button>
+                  <button onClick={() => hidePost(p.id)} className="p-2 rounded-lg border border-red-200 text-red-600" title="Приховати"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+

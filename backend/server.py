@@ -28586,6 +28586,14 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).error("lumen_asset_intelligence router failed: %s", _e)
 
+# ── Lumen Community OS — Phase C (C1–C7) ──
+try:
+    import lumen_community as _lumen_community  # noqa: E402
+    fastapi_app.include_router(_lumen_community.router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).error("lumen_community router failed: %s", _e)
+
 # ── Lumen Payments & Funding + Ledger (Sprint 6) ──
 try:
     import lumen_payments as _lumen_payments  # noqa: E402
@@ -28805,6 +28813,17 @@ try:
             _lp0_log.info("[Phase B] Asset Intelligence demo seed: %s", _ires)
         except Exception as _ex:
             _lp0_log.exception("[Phase B] Asset Intelligence demo seed failed: %s", _ex)
+
+    # ── Phase C: Community OS indexes + demo seed (idempotent) ──
+    @fastapi_app.on_event("startup")
+    async def _lumen_phase_c_bootstrap():
+        try:
+            from lumen_community import ensure_community_indexes as _ci, seed_community_demo as _sc
+            await _ci()
+            _cres = await _sc()
+            _lp0_log.info("[Phase C] Community OS seed: %s", _cres)
+        except Exception as _ex:
+            _lp0_log.exception("[Phase C] Community OS seed failed: %s", _ex)
 
     # ── Admin diagnostic endpoints ───────────────────────────────────────────
     from fastapi import Depends as _p0_Depends

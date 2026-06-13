@@ -1,484 +1,483 @@
+#!/usr/bin/env python3
 """
-LUMEN 2.0 Phase A3 — Ownership Lifecycle Backend Testing
-Tests all lifecycle APIs, certificate binding, ownership trace, and A1/A2 invariants.
+Phase C Community OS Backend Testing
+Tests all community endpoints: public, auth gating, holder flow, non-holder gating, admin
 """
 import requests
 import sys
-import json
 from datetime import datetime
 
-BASE_URL = "https://code-setup-10.preview.emergentagent.com/api"
+BASE_URL = "https://arch-review-25.preview.emergentagent.com/api"
 
-class A3LifecycleTester:
+# Test credentials
+ADMIN_EMAIL = "admin@atlas.dev"
+ADMIN_PASSWORD = "admin123"
+CLIENT_EMAIL = "client@atlas.dev"
+CLIENT_PASSWORD = "client123"
+
+# Test assets
+ASSET_HOLDER = "asset-podilskyi"  # client@atlas.dev owns units here
+ASSET_NON_HOLDER = "asset-rivne-warehouse"  # client@atlas.dev does NOT own units here
+ASSET_ADMIN_TEST = "asset-lavr-tc"  # for admin tests
+
+class CommunityTester:
     def __init__(self):
-        self.base_url = BASE_URL
-        self.admin_session = None
-        self.investor_session = None
+        self.session = requests.Session()
         self.tests_run = 0
         self.tests_passed = 0
         self.tests_failed = 0
         self.failures = []
 
     def log(self, msg, level="INFO"):
-        """Log test messages"""
-        prefix = "✅" if level == "PASS" else "❌" if level == "FAIL" else "🔍"
-        print(f"{prefix} {msg}")
+        print(f"[{level}] {msg}")
 
-    def test(self, name, condition, details=""):
-        """Run a test assertion"""
+    def test(self, name, fn):
+        """Run a single test"""
         self.tests_run += 1
-        if condition:
+        self.log(f"\n{'='*60}")
+        self.log(f"TEST {self.tests_run}: {name}")
+        self.log('='*60)
+        try:
+            fn()
             self.tests_passed += 1
-            self.log(f"PASS: {name}", "PASS")
-            if details:
-                print(f"   └─ {details}")
-        else:
+            self.log(f"✅ PASSED: {name}", "PASS")
+        except AssertionError as e:
             self.tests_failed += 1
-            self.failures.append(f"{name}: {details}")
-            self.log(f"FAIL: {name} - {details}", "FAIL")
+            self.failures.append(f"{name}: {str(e)}")
+            self.log(f"❌ FAILED: {name} - {str(e)}", "FAIL")
+        except Exception as e:
+            self.tests_failed += 1
+            self.failures.append(f"{name}: {str(e)}")
+            self.log(f"❌ ERROR: {name} - {str(e)}", "ERROR")
 
-    def login(self, email, password, role="investor"):
-        """Login and get session token"""
+    def login(self, email, password):
+        """Login and store cookies"""
         self.log(f"Logging in as {email}...")
-        try:
-            resp = requests.post(
-                f"{self.base_url}/auth/login",
-                json={"email": email, "password": password},
-                timeout=10
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                token = data.get("session_token") or data.get("token")
-                if token:
-                    self.log(f"Login successful for {email}", "PASS")
-                    return token
-                else:
-                    self.log(f"Login response missing token: {data}", "FAIL")
-                    return None
+        r = self.session.post(f"{BASE_URL}/auth/login", json={"email": email, "password": password})
+        assert r.status_code == 200, f"Login failed: {r.status_code} {r.text}"
+        self.log(f"✓ Logged in as {email}")
+        return r.json()
+
+    def logout(self):
+        """Clear session"""
+        self.session.cookies.clear()
+        self.log("✓ Logged out")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PUBLIC (NO AUTH) TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_public_summary(self):
+        """Public GET /api/assets/{asset}/community/summary"""
+        self.logout()
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/summary")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        # Check required fields
+        assert data.get("holders_count", 0) > 0, "holders_count should be > 0"
+        assert "sentiment" in data, "sentiment missing"
+        sentiment = data["sentiment"]
+        assert "positive" in sentiment, "sentiment.positive missing"
+        assert "neutral" in sentiment, "sentiment.neutral missing"
+        assert "negative" in sentiment, "sentiment.negative missing"
+        assert "label" in sentiment, "sentiment.label missing"
+        assert data.get("posts_count", 0) >= 0, "posts_count missing"
+        assert "open_polls" in data, "open_polls missing"
+        self.log(f"✓ Summary: holders={data['holders_count']}, sentiment={sentiment['label']}, posts={data['posts_count']}, polls={data['open_polls']}")
+
+    def test_public_feed(self):
+        """Public GET /api/assets/{asset}/community/feed - should only see public posts"""
+        self.logout()
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/feed")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert "items" in data, "items missing"
+        assert data.get("can_see_lounge") == False, "Anon should NOT see lounge"
+        
+        # Check that only public posts are visible (announcements + questions)
+        items = data["items"]
+        for post in items:
+            assert post["kind"] in ["announcement", "question"], f"Anon should only see announcements/questions, got {post['kind']}"
+            assert post.get("visibility") == "public", f"Anon should only see public posts, got {post.get('visibility')}"
+        
+        self.log(f"✓ Feed: {len(items)} public posts, can_see_lounge={data['can_see_lounge']}")
+
+    def test_public_polls(self):
+        """Public GET /api/assets/{asset}/community/polls"""
+        self.logout()
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/polls")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert "items" in data, "items missing"
+        items = data["items"]
+        
+        # Check poll structure
+        for poll in items:
+            assert "options" in poll, "poll.options missing"
+            for opt in poll["options"]:
+                assert "units" in opt, "option.units missing"
+                assert "percent" in opt, "option.percent missing"
+        
+        self.log(f"✓ Polls: {len(items)} polls with weighted options")
+
+    def test_public_leaderboard(self):
+        """Public GET /api/assets/{asset}/community/leaderboard"""
+        self.logout()
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/leaderboard")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert "items" in data, "items missing"
+        items = data["items"]
+        
+        # Check leaderboard structure
+        for row in items:
+            assert "tier_label" in row, "tier_label missing"
+            assert "score" in row, "score missing"
+        
+        self.log(f"✓ Leaderboard: {len(items)} rows with tier_label")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AUTH GATING TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_anon_post_blocked(self):
+        """Anon POST /api/assets/{asset}/community/posts should return 401/403"""
+        self.logout()
+        r = self.session.post(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/posts", 
+                             json={"kind": "question", "title": "Test", "body": "Testing anon post"})
+        assert r.status_code in [401, 403], f"Expected 401/403, got {r.status_code}"
+        self.log(f"✓ Anon post blocked with {r.status_code}")
+
+    def test_anon_vote_blocked(self):
+        """Anon POST /api/community/polls/{poll_id}/vote should return 401"""
+        self.logout()
+        # First get a poll ID
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/polls")
+        if r.status_code == 200 and r.json().get("items"):
+            poll_id = r.json()["items"][0]["id"]
+            r = self.session.post(f"{BASE_URL}/community/polls/{poll_id}/vote", 
+                                 json={"option_key": "opt1"})
+            assert r.status_code == 401, f"Expected 401, got {r.status_code}"
+            self.log(f"✓ Anon vote blocked with {r.status_code}")
+        else:
+            self.log("⚠ No polls available to test anon vote blocking")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # HOLDER FLOW TESTS (client@atlas.dev on asset-podilskyi)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_holder_summary(self):
+        """Holder GET /api/assets/{asset}/community/summary should show is_holder=true"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/summary")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("is_holder") == True, "is_holder should be True"
+        assert data.get("units", 0) > 0, "units should be > 0"
+        self.log(f"✓ Holder summary: is_holder={data['is_holder']}, units={data['units']}")
+
+    def test_holder_feed_lounge(self):
+        """Holder GET /api/assets/{asset}/community/feed should include discussion posts"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/feed")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("can_see_lounge") == True, "Holder should see lounge"
+        
+        # Check for discussion posts
+        items = data["items"]
+        has_discussion = any(p["kind"] == "discussion" for p in items)
+        self.log(f"✓ Holder feed: {len(items)} posts, can_see_lounge={data['can_see_lounge']}, has_discussion={has_discussion}")
+
+    def test_holder_post_discussion(self):
+        """Holder POST /api/assets/{asset}/community/posts with kind='discussion'"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/posts",
+                             json={"kind": "discussion", "title": "QA lounge", "body": "testing holder access"})
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("visibility") == "holders", "Discussion should be holders-only"
+        self.log(f"✓ Holder posted discussion: id={data['id']}, visibility={data['visibility']}")
+        return data["id"]
+
+    def test_holder_post_question(self):
+        """Holder POST /api/assets/{asset}/community/posts with kind='question'"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/posts",
+                             json={"kind": "question", "title": "QA q", "body": "a question for operator"})
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("visibility") == "public", "Question should be public"
+        self.log(f"✓ Holder posted question: id={data['id']}, visibility={data['visibility']}")
+        return data["id"]
+
+    def test_holder_comment(self):
+        """Holder POST /api/community/posts/{post_id}/comments"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        
+        # First get a post to comment on
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/feed")
+        if r.status_code == 200 and r.json().get("items"):
+            post_id = r.json()["items"][0]["id"]
+            r = self.session.post(f"{BASE_URL}/community/posts/{post_id}/comments",
+                                 json={"body": "nice"})
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            self.log(f"✓ Holder commented on post {post_id}")
+        else:
+            self.log("⚠ No posts available to test commenting")
+
+    def test_holder_react(self):
+        """Holder POST /api/community/posts/{post_id}/react"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        
+        # First get a post to react to
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/feed")
+        if r.status_code == 200 and r.json().get("items"):
+            post_id = r.json()["items"][0]["id"]
+            r = self.session.post(f"{BASE_URL}/community/posts/{post_id}/react",
+                                 json={"reaction": "like"})
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            data = r.json()
+            assert "active" in data, "active field missing"
+            self.log(f"✓ Holder reacted to post {post_id}, active={data['active']}")
+        else:
+            self.log("⚠ No posts available to test reacting")
+
+    def test_holder_sentiment(self):
+        """Holder POST /api/assets/{asset}/community/sentiment"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/sentiment",
+                             json={"mood": "positive"})
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("my_sentiment") == "positive", "my_sentiment should be 'positive'"
+        assert "sentiment" in data, "aggregated sentiment missing"
+        self.log(f"✓ Holder set sentiment: my_sentiment={data['my_sentiment']}")
+
+    def test_holder_vote(self):
+        """Holder POST /api/community/polls/{poll_id}/vote"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        
+        # First get an open poll
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_HOLDER}/community/polls")
+        if r.status_code == 200:
+            polls = [p for p in r.json().get("items", []) if p.get("status") == "open"]
+            if polls:
+                poll = polls[0]
+                poll_id = poll["id"]
+                option_key = poll["options"][0]["key"]
+                
+                r = self.session.post(f"{BASE_URL}/community/polls/{poll_id}/vote",
+                                     json={"option_key": option_key})
+                assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+                data = r.json()
+                
+                assert data.get("poll", {}).get("my_vote") == option_key, "my_vote should match"
+                assert data.get("poll", {}).get("total_units", 0) > 0, "total_units should increase"
+                self.log(f"✓ Holder voted: poll={poll_id}, option={option_key}, total_units={data['poll']['total_units']}")
             else:
-                self.log(f"Login failed: {resp.status_code} - {resp.text}", "FAIL")
-                return None
-        except Exception as e:
-            self.log(f"Login error: {str(e)}", "FAIL")
-            return None
+                self.log("⚠ No open polls available to test voting")
+        else:
+            self.log("⚠ Could not fetch polls to test voting")
 
-    def get(self, endpoint, session=None, params=None):
-        """GET request with optional auth session"""
-        try:
-            if session:
-                resp = session.get(
-                    f"{self.base_url}{endpoint}",
-                    params=params,
-                    timeout=15
-                )
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NON-HOLDER GATING TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_non_holder_discussion_blocked(self):
+        """Non-holder POST discussion on asset they don't own should return 403"""
+        self.login(CLIENT_EMAIL, CLIENT_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/assets/{ASSET_NON_HOLDER}/community/posts",
+                             json={"kind": "discussion", "title": "Test", "body": "Should fail"})
+        assert r.status_code == 403, f"Expected 403, got {r.status_code}"
+        self.log(f"✓ Non-holder discussion blocked with {r.status_code}")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ADMIN TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_admin_announcement(self):
+        """Admin POST /api/admin/assets/{asset}/community/announcements"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/admin/assets/{ASSET_ADMIN_TEST}/community/announcements",
+                             json={"title": "QA announce", "body": "x"})
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("ok") == True, "ok should be True"
+        assert "notified" in data, "notified count missing"
+        self.log(f"✓ Admin announcement: notified={data['notified']} holders")
+
+    def test_admin_poll(self):
+        """Admin POST /api/admin/assets/{asset}/community/polls"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        r = self.session.post(f"{BASE_URL}/admin/assets/{ASSET_ADMIN_TEST}/community/polls",
+                             json={"question": "QA poll?", "options": ["A", "B"], "closes_in_days": 7})
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+        data = r.json()
+        
+        assert data.get("ok") == True, "ok should be True"
+        assert "poll" in data, "poll missing"
+        assert data["poll"].get("id"), "poll.id missing"
+        self.log(f"✓ Admin poll created: id={data['poll']['id']}")
+        return data["poll"]["id"]
+
+    def test_admin_close_poll(self):
+        """Admin POST /api/admin/community/polls/{poll_id}/close"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        
+        # First create a poll
+        r = self.session.post(f"{BASE_URL}/admin/assets/{ASSET_ADMIN_TEST}/community/polls",
+                             json={"question": "Test close", "options": ["A", "B"], "closes_in_days": 7})
+        if r.status_code == 200:
+            poll_id = r.json()["poll"]["id"]
+            r = self.session.post(f"{BASE_URL}/admin/community/polls/{poll_id}/close")
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            data = r.json()
+            assert data.get("ok") == True, "ok should be True"
+            self.log(f"✓ Admin closed poll: id={poll_id}")
+        else:
+            self.log("⚠ Could not create poll to test closing")
+
+    def test_admin_answer_question(self):
+        """Admin POST /api/admin/community/posts/{post_id}/answer"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        
+        # First get a question post
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_ADMIN_TEST}/community/feed?filter=questions")
+        if r.status_code == 200:
+            questions = [p for p in r.json().get("items", []) if p.get("kind") == "question" and not p.get("answer")]
+            if questions:
+                post_id = questions[0]["id"]
+                r = self.session.post(f"{BASE_URL}/admin/community/posts/{post_id}/answer",
+                                     json={"answer": "operator reply"})
+                assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+                data = r.json()
+                assert data.get("ok") == True, "ok should be True"
+                assert data.get("post", {}).get("answer") == "operator reply", "answer not set"
+                self.log(f"✓ Admin answered question: post={post_id}")
             else:
-                resp = requests.get(
-                    f"{self.base_url}{endpoint}",
-                    params=params,
-                    timeout=15
-                )
-            return resp
-        except Exception as e:
-            self.log(f"GET {endpoint} error: {str(e)}", "FAIL")
-            return None
+                self.log("⚠ No unanswered questions to test answering")
+        else:
+            self.log("⚠ Could not fetch questions to test answering")
 
-    def post(self, endpoint, session=None, json_data=None):
-        """POST request with optional auth session"""
-        try:
-            if session:
-                resp = session.post(
-                    f"{self.base_url}{endpoint}",
-                    json=json_data,
-                    timeout=15
-                )
-            else:
-                resp = requests.post(
-                    f"{self.base_url}{endpoint}",
-                    json=json_data,
-                    timeout=15
-                )
-            return resp
-        except Exception as e:
-            self.log(f"POST {endpoint} error: {str(e)}", "FAIL")
-            return None
+    def test_admin_pin_post(self):
+        """Admin POST /api/admin/community/posts/{post_id}/pin"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        
+        # First get a post
+        r = self.session.get(f"{BASE_URL}/assets/{ASSET_ADMIN_TEST}/community/feed")
+        if r.status_code == 200 and r.json().get("items"):
+            post_id = r.json()["items"][0]["id"]
+            r = self.session.post(f"{BASE_URL}/admin/community/posts/{post_id}/pin")
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            data = r.json()
+            assert data.get("ok") == True, "ok should be True"
+            assert "pinned" in data, "pinned field missing"
+            self.log(f"✓ Admin toggled pin: post={post_id}, pinned={data['pinned']}")
+        else:
+            self.log("⚠ No posts available to test pinning")
 
-    # ========================================================================
-    # TEST SUITE
-    # ========================================================================
+    def test_admin_delete_post(self):
+        """Admin DELETE /api/admin/community/posts/{post_id}"""
+        self.login(ADMIN_EMAIL, ADMIN_PASSWORD)
+        
+        # First create a test post as admin (via announcement)
+        r = self.session.post(f"{BASE_URL}/admin/assets/{ASSET_ADMIN_TEST}/community/announcements",
+                             json={"title": "Test delete", "body": "Will be deleted"})
+        if r.status_code == 200:
+            post_id = r.json()["post"]["id"]
+            r = self.session.delete(f"{BASE_URL}/admin/community/posts/{post_id}")
+            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+            data = r.json()
+            assert data.get("ok") == True, "ok should be True"
+            self.log(f"✓ Admin deleted post: id={post_id}")
+        else:
+            self.log("⚠ Could not create post to test deletion")
 
-    def test_auth(self):
-        """Test authentication for both admin and investor"""
-        self.log("\n=== TEST: Authentication ===")
-        
-        self.admin_session = self.login("admin@atlas.dev", "admin123", "admin")
-        self.test("Admin login", self.admin_session is not None)
-        
-        self.investor_session = self.login("client@atlas.dev", "client123", "investor")
-        self.test("Investor login", self.investor_session is not None)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # RUN ALL TESTS
+    # ═══════════════════════════════════════════════════════════════════════════
 
-    def test_investor_lifecycle(self):
-        """Test GET /api/investor/lifecycle"""
-        self.log("\n=== TEST: Investor Lifecycle (Portfolio Timeline 2.0) ===")
+    def run_all(self):
+        """Run all tests"""
+        self.log("\n" + "="*60)
+        self.log("PHASE C COMMUNITY OS - BACKEND TESTING")
+        self.log("="*60)
         
-        resp = self.get("/investor/lifecycle", self.investor_session)
-        self.test("GET /investor/lifecycle returns 200", resp and resp.status_code == 200)
+        # PUBLIC TESTS
+        self.log("\n" + "─"*60)
+        self.log("PUBLIC (NO AUTH) TESTS")
+        self.log("─"*60)
+        self.test("Public summary", self.test_public_summary)
+        self.test("Public feed (anon sees only public posts)", self.test_public_feed)
+        self.test("Public polls", self.test_public_polls)
+        self.test("Public leaderboard", self.test_public_leaderboard)
         
-        if not resp or resp.status_code != 200:
-            return
+        # AUTH GATING TESTS
+        self.log("\n" + "─"*60)
+        self.log("AUTH GATING TESTS")
+        self.log("─"*60)
+        self.test("Anon post blocked", self.test_anon_post_blocked)
+        self.test("Anon vote blocked", self.test_anon_vote_blocked)
         
-        data = resp.json()
-        items = data.get("items", [])
+        # HOLDER FLOW TESTS
+        self.log("\n" + "─"*60)
+        self.log("HOLDER FLOW TESTS (client@atlas.dev on asset-podilskyi)")
+        self.log("─"*60)
+        self.test("Holder summary", self.test_holder_summary)
+        self.test("Holder feed includes lounge", self.test_holder_feed_lounge)
+        self.test("Holder post discussion", self.test_holder_post_discussion)
+        self.test("Holder post question", self.test_holder_post_question)
+        self.test("Holder comment", self.test_holder_comment)
+        self.test("Holder react", self.test_holder_react)
+        self.test("Holder set sentiment", self.test_holder_sentiment)
+        self.test("Holder vote", self.test_holder_vote)
         
-        self.test("Returns items array", isinstance(items, list))
-        self.test("Has at least 1 investment", len(items) >= 1, f"Found {len(items)} investments")
+        # NON-HOLDER GATING TESTS
+        self.log("\n" + "─"*60)
+        self.log("NON-HOLDER GATING TESTS")
+        self.log("─"*60)
+        self.test("Non-holder discussion blocked", self.test_non_holder_discussion_blocked)
         
-        if len(items) == 0:
-            return
+        # ADMIN TESTS
+        self.log("\n" + "─"*60)
+        self.log("ADMIN TESTS")
+        self.log("─"*60)
+        self.test("Admin announcement", self.test_admin_announcement)
+        self.test("Admin create poll", self.test_admin_poll)
+        self.test("Admin close poll", self.test_admin_close_poll)
+        self.test("Admin answer question", self.test_admin_answer_question)
+        self.test("Admin pin post", self.test_admin_pin_post)
+        self.test("Admin delete post", self.test_admin_delete_post)
         
-        # Check first investment structure
-        inv = items[0]
-        self.test("Investment has investment_id", "investment_id" in inv)
-        self.test("Investment has canonical_state", "canonical_state" in inv)
-        self.test("Investment has certificate_number", "certificate_number" in inv or inv.get("certificate_number") is None)
-        self.test("Investment has units", "units" in inv)
-        self.test("Investment has steps array", "steps" in inv and isinstance(inv.get("steps"), list))
-        
-        # Check 8-step timeline
-        steps = inv.get("steps", [])
-        self.test("Has 8 steps in timeline", len(steps) == 8, f"Found {len(steps)} steps")
-        
-        if len(steps) == 8:
-            expected_keys = ["intent", "kyc", "contract", "payment", "certificate", "active", "first_payout", "withdrawal"]
-            actual_keys = [s.get("key") for s in steps]
-            self.test("Steps have correct keys", actual_keys == expected_keys, f"Keys: {actual_keys}")
-            
-            # Check step structure
-            for step in steps:
-                if not all(k in step for k in ["key", "label", "status"]):
-                    self.test(f"Step {step.get('key')} has required fields", False, f"Missing fields in {step}")
-                    break
-            else:
-                self.test("All steps have required fields (key, label, status)", True)
-            
-            # Check status values
-            statuses = [s.get("status") for s in steps]
-            valid_statuses = all(s in ["done", "current", "pending"] for s in statuses)
-            self.test("All steps have valid status", valid_statuses, f"Statuses: {statuses}")
-        
-        # Check progress
-        progress = inv.get("progress", 0)
-        total_steps = inv.get("total_steps", 0)
-        self.test("Has progress tracking", progress >= 0 and total_steps == 8, 
-                  f"Progress: {progress}/{total_steps}")
-        
-        # Log sample investment for inspection
-        self.log(f"\nSample investment:")
-        self.log(f"  ID: {inv.get('investment_id')}")
-        self.log(f"  Asset: {inv.get('asset_title')}")
-        self.log(f"  State: {inv.get('canonical_state')} ({inv.get('canonical_state_label')})")
-        self.log(f"  Certificate: {inv.get('certificate_number') or 'None'}")
-        self.log(f"  Units: {inv.get('units')}")
-        self.log(f"  Progress: {progress}/{total_steps} steps")
-
-    def test_investor_lifecycle_detail(self):
-        """Test GET /api/investor/lifecycle/{investment_id}"""
-        self.log("\n=== TEST: Investor Lifecycle Detail ===")
-        
-        # First get an investment_id
-        resp = self.get("/investor/lifecycle", self.investor_token)
-        if not resp or resp.status_code != 200:
-            self.test("Cannot test detail - lifecycle list failed", False)
-            return
-        
-        items = resp.json().get("items", [])
-        if len(items) == 0:
-            self.test("Cannot test detail - no investments", False)
-            return
-        
-        investment_id = items[0].get("investment_id")
-        self.log(f"Testing detail for investment: {investment_id}")
-        
-        resp = self.get(f"/investor/lifecycle/{investment_id}", self.investor_session)
-        self.test("GET /investor/lifecycle/{id} returns 200", resp and resp.status_code == 200)
-        
-        if resp and resp.status_code == 200:
-            data = resp.json()
-            self.test("Detail has investment_id", data.get("investment_id") == investment_id)
-            self.test("Detail has canonical_state", "canonical_state" in data)
-            self.test("Detail has steps", "steps" in data and len(data.get("steps", [])) == 8)
-
-    def test_admin_lifecycle_states(self):
-        """Test GET /api/admin/lifecycle/states"""
-        self.log("\n=== TEST: Admin Lifecycle States ===")
-        
-        resp = self.get("/admin/lifecycle/states", self.admin_session)
-        self.test("GET /admin/lifecycle/states returns 200", resp and resp.status_code == 200)
-        
-        if not resp or resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        self.test("Has states array", "states" in data)
-        self.test("Has labels dict", "labels" in data)
-        self.test("Has counts dict", "counts" in data)
-        
-        counts = data.get("counts", {})
-        active_count = counts.get("active", 0)
-        self.test("Active state count >= 3", active_count >= 3, f"Active count: {active_count}")
-        
-        self.log(f"\nLifecycle state counts:")
-        for state, count in counts.items():
-            if count > 0:
-                label = data.get("labels", {}).get(state, state)
-                self.log(f"  {state} ({label}): {count}")
-
-    def test_ownership_trace(self):
-        """Test GET /api/admin/ownership/trace"""
-        self.log("\n=== TEST: Ownership Explorer - Full Trace ===")
-        
-        # First get an investor_id from lifecycle
-        resp = self.get("/investor/lifecycle", self.investor_session)
-        if not resp or resp.status_code != 200:
-            self.test("Cannot test trace - lifecycle failed", False)
-            return
-        
-        items = resp.json().get("items", [])
-        if len(items) == 0:
-            self.test("Cannot test trace - no investments", False)
-            return
-        
-        investor_id = items[0].get("investor_id")
-        asset_id = "asset-stoyanka-land"
-        
-        self.log(f"Testing trace for investor: {investor_id}, asset: {asset_id}")
-        
-        resp = self.get("/admin/ownership/trace", self.admin_session, 
-                       params={"investor_id": investor_id, "asset_id": asset_id})
-        self.test("GET /admin/ownership/trace returns 200", resp and resp.status_code == 200)
-        
-        if not resp or resp.status_code != 200:
-            return
-        
-        trace = resp.json()
-        
-        # Check trace structure
-        self.test("Trace has investor_id", trace.get("investor_id") == investor_id)
-        self.test("Trace has asset_id", trace.get("asset_id") == asset_id)
-        self.test("Trace has ownership", "ownership" in trace)
-        self.test("Trace has lifecycle", "lifecycle" in trace)
-        self.test("Trace has investments", "investments" in trace)
-        self.test("Trace has payments", "payments" in trace)
-        self.test("Trace has ledger", "ledger" in trace)
-        self.test("Trace has certificates", "certificates" in trace)
-        self.test("Trace has payouts", "payouts" in trace)
-        self.test("Trace has secondary_trades", "secondary_trades" in trace)
-        self.test("Trace has ownership_events", "ownership_events" in trace)
-        
-        # Check certificate binding (Block1)
-        ownership = trace.get("ownership")
-        if ownership:
-            cert_num = ownership.get("certificate_number")
-            cert_id = ownership.get("certificate_id")
-            self.test("Ownership has certificate_number bound", cert_num is not None, 
-                     f"Certificate: {cert_num}")
-            self.test("Ownership has certificate_id bound", cert_id is not None)
-            
-            self.log(f"\nOwnership binding:")
-            self.log(f"  Ownership ID: {ownership.get('id')}")
-            self.log(f"  Certificate ID: {cert_id}")
-            self.log(f"  Certificate Number: {cert_num}")
-            self.log(f"  Units: {ownership.get('units_int')}")
-        
-        # Log trace summary
-        self.log(f"\nTrace summary:")
-        self.log(f"  Investments: {len(trace.get('investments', []))}")
-        self.log(f"  Payments: {len(trace.get('payments', []))}")
-        self.log(f"  Ledger entries: {len(trace.get('ledger', []))}")
-        self.log(f"  Certificates: {len(trace.get('certificates', []))}")
-        self.log(f"  Payouts: {len(trace.get('payouts', []))}")
-        self.log(f"  Secondary trades: {len(trace.get('secondary_trades', []))}")
-        self.log(f"  Ownership events: {len(trace.get('ownership_events', []))}")
-
-    def test_ownership_trace_by_id(self):
-        """Test GET /api/admin/ownership/{ownership_id}/trace"""
-        self.log("\n=== TEST: Ownership Trace by ID ===")
-        
-        # First get an ownership_id from trace
-        resp = self.get("/investor/lifecycle", self.investor_session)
-        if not resp or resp.status_code != 200:
-            self.test("Cannot test trace by id - lifecycle failed", False)
-            return
-        
-        items = resp.json().get("items", [])
-        if len(items) == 0:
-            self.test("Cannot test trace by id - no investments", False)
-            return
-        
-        ownership_id = items[0].get("ownership_id")
-        if not ownership_id:
-            self.test("Cannot test trace by id - no ownership_id in lifecycle", False)
-            return
-        
-        self.log(f"Testing trace for ownership_id: {ownership_id}")
-        
-        resp = self.get(f"/admin/ownership/{ownership_id}/trace", self.admin_session)
-        self.test("GET /admin/ownership/{id}/trace returns 200", resp and resp.status_code == 200)
-        
-        if resp and resp.status_code == 200:
-            trace = resp.json()
-            self.test("Trace by ID has ownership", "ownership" in trace)
-            self.test("Trace by ID has lifecycle", "lifecycle" in trace)
-
-    def test_a1_invariants(self):
-        """Test A1 Unit Registry invariants"""
-        self.log("\n=== TEST: A1 Unit Registry Invariants ===")
-        
-        resp = self.get("/admin/registry/invariants", self.admin_session)
-        self.test("GET /admin/registry/invariants returns 200", resp and resp.status_code == 200)
-        
-        if not resp or resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        all_ok = data.get("all_ok", False)
-        self.test("A1 invariants all_ok = true", all_ok == True, 
-                 f"all_ok: {all_ok}")
-        
-        assets = data.get("assets", [])
-        self.log(f"\nA1 Invariant check for {len(assets)} assets:")
-        for asset in assets:
-            ok = asset.get("ok", False)
-            checks = asset.get("checks", {})
-            self.log(f"  {asset.get('asset_title')}: {'✅ OK' if ok else '❌ FAIL'}")
-            if not ok:
-                for check, result in checks.items():
-                    if not result:
-                        self.log(f"    ❌ {check}: {result}")
-
-    def test_a2_invariants(self):
-        """Test A2 Certificate Engine invariants"""
-        self.log("\n=== TEST: A2 Certificate Engine Invariants ===")
-        
-        resp = self.get("/admin/certificates/invariants/check", self.admin_session)
-        self.test("GET /admin/certificates/invariants/check returns 200", 
-                 resp and resp.status_code == 200)
-        
-        if not resp or resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        all_ok = data.get("all_ok", False)
-        self.test("A2 invariants all_ok = true", all_ok == True, 
-                 f"all_ok: {all_ok}")
-        
-        checks = data.get("checks", {})
-        self.log(f"\nA2 Invariant checks:")
-        for check, result in checks.items():
-            status = "✅" if result else "❌"
-            self.log(f"  {status} {check}: {result}")
-        
-        violations = data.get("violations", [])
-        if violations:
-            self.log(f"\n⚠️  Found {len(violations)} violations:")
-            for v in violations[:5]:  # Show first 5
-                self.log(f"  {v}")
-
-    def test_certificate_binding(self):
-        """Test Block1: Certificate Binding (ownership_id <-> certificate_id)"""
-        self.log("\n=== TEST: Block1 Certificate Binding ===")
-        
-        # Get trace to check binding
-        resp = self.get("/investor/lifecycle", self.investor_session)
-        if not resp or resp.status_code != 200:
-            self.test("Cannot test binding - lifecycle failed", False)
-            return
-        
-        items = resp.json().get("items", [])
-        if len(items) == 0:
-            self.test("Cannot test binding - no investments", False)
-            return
-        
-        investor_id = items[0].get("investor_id")
-        asset_id = items[0].get("asset_id")
-        
-        resp = self.get("/admin/ownership/trace", self.admin_session,
-                       params={"investor_id": investor_id, "asset_id": asset_id})
-        
-        if not resp or resp.status_code != 200:
-            self.test("Cannot test binding - trace failed", False)
-            return
-        
-        trace = resp.json()
-        ownership = trace.get("ownership")
-        
-        if not ownership:
-            self.test("Cannot test binding - no ownership in trace", False)
-            return
-        
-        # Check bidirectional binding
-        cert_id = ownership.get("certificate_id")
-        cert_num = ownership.get("certificate_number")
-        
-        self.test("Ownership has certificate_id", cert_id is not None)
-        self.test("Ownership has certificate_number", cert_num is not None)
-        
-        # Verify certificate points back to ownership
-        if cert_id:
-            resp = self.get(f"/admin/certificates/{cert_id}", self.admin_session)
-            if resp and resp.status_code == 200:
-                cert_data = resp.json()
-                cert = cert_data.get("certificate", {})
-                ownership_id_in_cert = cert.get("ownership_id")
-                self.test("Certificate has ownership_id pointing back", 
-                         ownership_id_in_cert == ownership.get("id"),
-                         f"Cert ownership_id: {ownership_id_in_cert}, Ownership id: {ownership.get('id')}")
-
-    def run_all_tests(self):
-        """Run all test suites"""
-        self.log("=" * 70)
-        self.log("LUMEN 2.0 Phase A3 — Ownership Lifecycle Backend Tests")
-        self.log("=" * 70)
-        
-        # Run tests in order
-        self.test_auth()
-        
-        if not self.admin_session or not self.investor_session:
-            self.log("\n❌ Authentication failed - cannot continue tests", "FAIL")
-            return False
-        
-        self.test_investor_lifecycle()
-        self.test_investor_lifecycle_detail()
-        self.test_admin_lifecycle_states()
-        self.test_ownership_trace()
-        self.test_ownership_trace_by_id()
-        self.test_certificate_binding()
-        self.test_a1_invariants()
-        self.test_a2_invariants()
-        
-        # Summary
-        self.log("\n" + "=" * 70)
-        self.log(f"TEST SUMMARY")
-        self.log("=" * 70)
+        # SUMMARY
+        self.log("\n" + "="*60)
+        self.log("TEST SUMMARY")
+        self.log("="*60)
         self.log(f"Total tests: {self.tests_run}")
-        self.log(f"Passed: {self.tests_passed} ✅")
-        self.log(f"Failed: {self.tests_failed} ❌")
+        self.log(f"Passed: {self.tests_passed}")
+        self.log(f"Failed: {self.tests_failed}")
         
-        if self.tests_failed > 0:
-            self.log("\n❌ FAILURES:")
+        if self.failures:
+            self.log("\n" + "─"*60)
+            self.log("FAILURES:")
+            self.log("─"*60)
             for failure in self.failures:
-                self.log(f"  • {failure}")
+                self.log(f"  • {failure}", "FAIL")
         
-        success_rate = (self.tests_passed / self.tests_run * 100) if self.tests_run > 0 else 0
-        self.log(f"\nSuccess rate: {success_rate:.1f}%")
-        
-        return self.tests_failed == 0
-
-
-def main():
-    tester = A3LifecycleTester()
-    success = tester.run_all_tests()
-    return 0 if success else 1
+        return 0 if self.tests_failed == 0 else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    tester = CommunityTester()
+    sys.exit(tester.run_all())

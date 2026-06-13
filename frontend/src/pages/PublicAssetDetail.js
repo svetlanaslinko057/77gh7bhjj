@@ -13,6 +13,7 @@ import {
   useAssetIntelligence, IntelligencePanel, InvestmentThesis, ScenarioEngine,
   CapitalStack, AssetJournal, SimilarAssets,
 } from '@/components/lumen/AssetIntelligence';
+import AssetCommunity from '@/components/lumen/AssetCommunity';
 import './LandingPage.css';
 
 const dashFor = (user) => (user?.role === 'admin' ? '/admin/dashboard' : '/investor/dashboard');
@@ -69,6 +70,7 @@ export default function PublicAssetDetail() {
               <Tabs tab={tab} setTab={setTab} dto={dto} journalCount={journal?.length || 0} />
 
               {tab === 'overview' && <OverviewSection dto={dto} intel={intel} similar={similar} />}
+              {tab === 'community' && <AssetCommunity assetId={dto.asset_id} user={user} basePath="objects" />}
               {tab === 'journal' && <AssetJournal items={journal} />}
               {tab === 'gallery' && <GallerySection gallery={dto.sections?.gallery} />}
               {tab === 'updates' && <UpdatesSection updates={dto.sections?.updates} reports={dto.sections?.reports} />}
@@ -168,6 +170,7 @@ const TrustCell = ({ icon, label, value }) => (
 const Tabs = ({ tab, setTab, dto, journalCount = 0 }) => {
   const items = [
     { k: 'overview', label: 'Огляд', icon: Layers },
+    { k: 'community', label: 'Спільнота', icon: Users },
     { k: 'journal', label: 'Шлях активу', icon: Calendar, count: journalCount },
     { k: 'gallery', label: 'Галерея', icon: ImageIcon, count: (dto.sections?.gallery?.photos?.length || 0) },
     { k: 'updates', label: 'Оновлення та звіти', icon: Newspaper, count: ((dto.sections?.updates?.length || 0) + (dto.sections?.reports?.length || 0)) },
