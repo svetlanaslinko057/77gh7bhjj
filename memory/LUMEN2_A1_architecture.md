@@ -9,7 +9,7 @@
 |------|-------|------|--------|
 | **A** | Ownership OS | Фундамент володіння: integer units, сертифікати, lifecycle | **A1/A2/A3 DONE** |
 | **B** | Asset Marketplace 2.0 | Investment Thesis, Scenario Engine, Capital Stack, Asset Journal, Live Metrics, Conviction/Liquidity Score, Similar Assets | **DONE (B1–B8)** |
-| C | Community OS | Discussion Board, Voting (голосують units), Activity Feed | pending |
+| C | Community OS | Discussion Board, Voting (голосують units), Activity Feed | **DONE (C1–C7)** |
 | D | Secondary Market 2.0 | Order Book (BID/ASK), Partial Fill, Market Data, Liquidity, OTC | pending |
 | E | Portfolio OS | Allocation, Health (diversification/concentration), Goals | pending |
 | F | Payment Rails 2.0 | USDT rail (тільки ввід), Auto Conversion, Multi-Currency | pending |
@@ -55,6 +55,46 @@
 ### Тести (iteration_4.json)
 - Backend 32/33 ✅ (1 transient 502, не баг). Frontend 100% ✅. 0 critical/UI/integration issues.
 - Демо-сід: 5 активів збагачено thesis+capital_stack+occupancy+milestones на старті (ідемпотентно).
+
+---
+
+## Phase C — Ownership Community OS (IMPLEMENTED)
+
+### Принцип
+Поворот після B: головний дефіцит LUMEN — не торгівля долями, а *причина повертатися*
+між купівлею і продажем. Community OS закриває це. Це НЕ форум/соцмережа — спільнота
+будується НАВКОЛО конкретного активу і гейтиться реальним володінням (units з
+`lumen_ownerships`). Усе деривується з реальних даних.
+
+### Файли / колекції
+- Engine + API: `backend/lumen_community.py` (router prefix `/api`, wired у server.py + startup `ensure_community_indexes` + `seed_community_demo`).
+- Колекції: `lumen_community_posts` (discussion|question|announcement), `lumen_community_comments`, `lumen_community_polls`, `lumen_community_ballots` (unique poll+voter, зберігає units_weight), `lumen_community_sentiment` (unique asset+holder mood pulse).
+- Гейтинг: `_units_of(asset_id, uid)` з `lumen_ownerships`; admin bypass.
+
+### Блоки
+- **C1 Asset Feed** — стрічка на актив: оголошення + питання + обговорення (не глобальна).
+- **C2 Ownership Lounge** — units-gated: маєш units → бачиш/постиш holders-only обговорення.
+- **C3 Questions 2.0** — питання → відповідь оператора → коментарі інвесторів (обговорення).
+- **C4 Voting** — опитування, ВАГА = units власника (рекомендаційне, не юридичне). Ballot upsert per voter, snapshot units_weight.
+- **C5 Asset Sentiment** — mood pulse власника (positive/neutral/negative), зважений по units → positive/neutral/negative %. Без AI.
+- **C6 Reputation** — per-asset (НЕ глобальна карма): score = posts·5 + comments·2 + votes·3 + pulse·1 + reactions_received·1 → tiers Спостерігач/Учасник/Активний/Лідер.
+- **C7 Announcements** — оператор публікує (орендар/ремонт/звіт/виплата) → нотифікації всім власникам (`lumen_notifications`).
+
+### API
+- Public/holder: `GET /api/assets/{id}/community/summary|feed|polls|leaderboard`, `GET /api/community/posts/{post_id}`
+- Auth: `POST /api/assets/{id}/community/posts` (discussion=holder, question=any), `/posts/{id}/comments`, `/posts/{id}/react`, `/comments/{id}/react`, `POST /api/assets/{id}/community/sentiment`, `POST /api/community/polls/{id}/vote`
+- Admin: `POST /api/admin/assets/{id}/community/announcements` (notifies holders), `POST .../community/polls`, `POST /api/admin/community/polls/{id}/close`, `POST /api/admin/community/posts/{id}/answer|pin`, `DELETE /api/admin/community/posts/{id}`, `DELETE /api/admin/community/comments/{id}`
+
+### Frontend
+- Компонент: `src/components/lumen/AssetCommunity.js` (sentiment bar, mood selector, sub-nav Стрічка/Lounge/Голосування/Рейтинг, PostCard з реакціями+коментарями+відповіддю оператора, PollCard з unit-weighted результатами, Composer, Leaderboard).
+- Вкладка «Спільнота» на `InvestorAssetDetail.js` (holder-досвід) і `PublicAssetDetail.js` (anon бачить публічне + login prompt, lounge заблокований).
+- Admin: `AdminAssetContent.js` вкладка «Спільнота» — оголошення (C7), створення/закриття опитувань (C4), модерація (answer/pin/hide).
+- Нотифікації від C7/коментарів падають у наявну сторінку нотифікацій інвестора.
+
+### Тести (iteration_5.json)
+- Backend 20/21 ✅ (1 «fail» = login rate-limit, очікувано). Frontend 100% ✅. 0 critical/UI/integration issues.
+- Перевірено: гейтинг (anon 401/403, non-holder 403), unit-weighted voting, sentiment, reputation/leaderboard, оголошення→нотифікації, відповідь/pin/hide оператора.
+- Демо-сід: оголошення + lounge-обговорення + опитування + mood pulses на реальних власниках (ідемпотентно).
 
 ---
 
